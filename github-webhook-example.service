@@ -5,8 +5,7 @@ After=network.target
 [Service]
 Type=simple
 User=username
-WorkingDirectory=/home/username/GitHubWebhook
-ExecStart=python github-webhook.py --dir /srv/app 'git pull && docker-compose up --build --detach'
+ExecStart=/home/username/GitHubWebhook/github-webhook.sh --dir /srv/app 'git pull && docker-compose up --build --detach'
 
 RestartSec=10
 Restart=always
