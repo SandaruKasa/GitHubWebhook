@@ -1,3 +1,4 @@
 flask==2.1
 waitress==2.1
 paste==2.0
+six==1.16 #because paste can't manage its own dependencies
