@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
+import logging
 import os
 import subprocess
 from pathlib import Path
+from threading import Thread
 
 from flask import Flask, request
 
@@ -13,32 +15,41 @@ def decode(b: bytes) -> str:
         return repr(b)
 
 
+def run_task():
+    completed_process = subprocess.run(
+        args.command,
+        shell=True,
+        input="",
+        stderr=subprocess.STDOUT,
+        stdout=subprocess.PIPE,
+        cwd=args.dir,
+    )
+    result = "Process {!r} finished with return code {}:\n{}".format(
+        completed_process.args,
+        completed_process.returncode,
+        decode(completed_process.stdout),
+    )
+    if completed_process.returncode == 0:
+        logging.info(result)
+    else:
+        logging.error(result)
+
+
 app = Flask(__name__)
 
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
+    # todo: secret
     ref = request.json.get("ref")
     expected = ["refs/heads/master", "refs/heads/main"]
     if ref in expected:
-        process = subprocess.run(
-            args.command,
-            shell=True,
-            input="",
-            stderr=subprocess.STDOUT,
-            stdout=subprocess.PIPE,
-            cwd=args.dir,
-        )
-        return (
-            "Process {!r} finished with return code {}:\n{}".format(
-                process.args,
-                process.returncode,
-                decode(process.stdout),
-            ),
-            200 if process.returncode == 0 else 418,
-        )
+        thread = Thread(target=run_task)
+        thread.daemon = False
+        thread.start()
+        return f"Running {args.command!r}...", 202
     else:
-        return f"Ref {repr(ref)} is not one of {expected}. Not doing anything.", 202
+        return f"Ref {ref!r} is not one of {expected}. Not doing anything.", 200
 
 
 def get_parser(default_port, default_address="0.0.0.0"):
@@ -76,7 +87,6 @@ def get_parser(default_port, default_address="0.0.0.0"):
 
 if __name__ == "__main__":
     import argparse
-    import logging
 
     import waitress
     from paste.translogger import TransLogger
